@@ -762,7 +762,7 @@ docker inspect 容器ID
 
 
 
-#### 小结
+### *小结
 
 ![image-20201110153941920](Docker学习记录.assets/image-20201110153941920.png)
 
@@ -806,6 +806,8 @@ version		Show the docker version information			#查看docker版本号
 wait		Block until a container stops，then print its exit code #截取容器停止时的退出状态值
 
 ```
+
+
 
 ### 部署实例
 
@@ -1297,7 +1299,7 @@ CMD /bin/bash
 ```shell
 docker build -f dockerfile1 -t jiemoo/centos:1.0 .
 -f dockerfile脚本的路径(可以是相对路径)
--t 版本名字:版本号
+-t 镜像名字:版本号
 REPOSITORY       TAG     IMAGE ID        CREATED              SIZE
 jiemoo/centos    1.0     27cb55142d56    About a minute ago   215MB
 . 当前路径
@@ -1464,6 +1466,255 @@ dockerfile是用来构建docker镜像的文件，就是命令参数脚本
 
 ![image-20201112144157450](Docker学习记录.assets/image-20201112144157450.png)
 
+很多官方镜像都是基础包，很多功能都是没有的，我们通常会搭建自己的镜像
+
+### Dockerfile的构建过程
+
+**基础知识**
+
+1. 每个保留关键字（指令）都必须是大写字母
+2. 执行从上到下顺序执行
+3. #表示注释
+4. 每个指令都会创建提交一个新的镜像层，并提交
+
+![img](Docker学习记录.assets/timg)
+
+dockerfile是面向开发的，以后要发布项目，做镜像，就需要编写dockerfile文件，这个文件非常简单
+
+**Docker镜像逐渐成为企业交付的标准**
+
+DockerFile：构建文件，定义了一切的步骤，源代码
+
+DockerImages：通过DockerFile构建生成的镜像，最终发布和运行的产品
+
+Docker容器：容器就是镜像运行起来提供的服务
+
+
+
+
+
+### DockerFIle的指令
+
+> 很多指令：
+```shell
+FROM                   #基础镜像，一切从这里开始
+MAINTAINER             #镜像是谁写的，姓名+邮箱
+RUN                    #镜像构建的时候需要运行的命令
+ADD                    #添加压缩包
+WORKDIR                #镜像的工作目录
+VOLUME                 #挂载的目录
+EXPOST                 #保留端口配置
+CMD                    #指定这个容器启动时要运行的命令，只有最后一个会生效，可被替代
+ENTRYPOINT             #指定这个容器启动时要运行的命令，可以追加命令
+ONBUILD                #当构建一个被继承的 DockerFile， 这个时候就会运行ONBUILD的指令
+COPY                   #类似ADD，将文件拷贝到镜像中
+ENV                    #构建的时候设置环境变量
+```
+
+
+![img](Docker学习记录.assets/20171023143753139)
+
+![img](Docker学习记录.assets/u=268974649,2607019911&fm=26&gp=0.jpg)
+
+
+
+
+
+### 实战测试
+
+Docker Hub中99%的镜像都是 FROM scratch 的，然后配置需要的软件和配置来进行构建
+
+![image-20201112144157450](Docker学习记录.assets/image-20201112144157450.png)
+
+```shell
+FROM scratch
+ADD centos-7-x86_64-docker.tar.xz /
+
+LABEL \
+    org.label-schema.schema-version="1.0" \
+    org.label-schema.name="CentOS Base Image" \
+    org.label-schema.vendor="CentOS" \
+    org.label-schema.license="GPLv2" \
+    org.label-schema.build-date="20200809" \
+    org.opencontainers.image.title="CentOS Base Image" \
+    org.opencontainers.image.vendor="CentOS" \
+    org.opencontainers.image.licenses="GPL-2.0-only" \
+    org.opencontainers.image.created="2020-08-09 00:00:00+01:00"
+
+CMD ["/bin/bash"]
+```
+
+**尝试创建**
+
+```shell
+# 编写DockerFile
+[root@VM-0-14-centos dockerfile]# vim mydockerfile-centos
+[root@VM-0-14-centos dockerfile]# cat mydockerfile-centos 
+FROM centos
+MAINTAINER jiemoo<978090944@qq.com>
+
+ENV MYPATH /usr/local
+WORKDIR $MYPATH
+
+RUN yum -y install vim
+RUN yum -y install net-tools
+
+EXPOSE 80
+
+CMD echo $MYPATH
+CMD echo "---end---"
+CMD /bin/bash
+#-f dockerfile 文件路径 -t 镜像名:版本号
+[root@VM-0-14-centos dockerfile]# docker build -f mydockerfile-centos -t mycentos:0.1 .  #注意这里有个点 代表当前目录是上下文环境
+[输出信息略]
+Successfully built 861801ebd3f1
+Successfully tagged mycentos:0.1
+
+[root@VM-0-14-centos dockerfile]# docker images
+REPOSITORY      TAG         IMAGE ID            CREATED             SIZE
+mycentos        0.1         861801ebd3f1        24 seconds ago      295MB
+
+#运行测试
+[root@VM-0-14-centos dockerfile]# docker run -it 861801ebd3f1
+[root@3f418c9ab6ce local]# pwd
+/usr/local
+#直接就是工作目录
+[root@3f418c9ab6ce local]# vim
+[root@3f418c9ab6ce local]# ifconfig
+#这两个也都能用了
+```
+
+**列出本地镜像的变更历史**
+
+```shell
+[root@VM-0-14-centos dockerfile]# docker history 861801ebd3f1
+IMAGE               CREATED             CREATED BY                                      SIZE                COMMENT
+861801ebd3f1        9 minutes ago       /bin/sh -c #(nop)  CMD ["/bin/sh" "-c" "/bin…   0B                  
+aedef5310350        9 minutes ago       /bin/sh -c #(nop)  CMD ["/bin/sh" "-c" "echo…   0B                  
+51c43530f274        9 minutes ago       /bin/sh -c #(nop)  CMD ["/bin/sh" "-c" "echo…   0B                  
+e3ede2fc2b09        9 minutes ago       /bin/sh -c #(nop)  EXPOSE 80                    0B                  
+c6257a0f7ed6        9 minutes ago       /bin/sh -c yum -y install net-tools             22.8MB              
+5f27aaf714f4        9 minutes ago       /bin/sh -c yum -y install vim                   57.2MB              
+0c988d2d9fa1        9 minutes ago       /bin/sh -c #(nop) WORKDIR /usr/local            0B                  
+a907a0ae34fa        9 minutes ago       /bin/sh -c #(nop)  ENV MYPATH=/usr/local        0B                  
+9549674121fd        9 minutes ago       /bin/sh -c #(nop)  MAINTAINER jiemoo<9780909…   0B                  
+0d120b6ccaa8        3 months ago        /bin/sh -c #(nop)  CMD ["/bin/bash"]            0B                  
+<missing>           3 months ago        /bin/sh -c #(nop)  LABEL org.label-schema.sc…   0B                  
+<missing>           3 months ago        /bin/sh -c #(nop) ADD file:538afc0c5c964ce0d…   215MB               
+
+```
+
+
+
+### 一些指令的区别
+
+> CMD 和 ENTRYPOINT 的区别
+>
+> CMD                           #指定这个容器启动时要运行的命令，只有最后一个会生效，可被替代
+> ENTRYPOINT             #指定这个容器启动时要运行的命令，可以追加命令
+
+**CMD的效果**
+
+```shell
+[root@VM-0-14-centos dockerfile]# cat dockerfile-cmd-test 
+FROM centos
+CMD ["ls","-a"]
+[root@VM-0-14-centos dockerfile]# docker build -f dockerfile-cmd-test -t cmdtest .
+[root@VM-0-14-centos dockerfile]# docker run cc2edd92a3e0
+#目录都输出出来了
+#本来直接追加-l 是可以显示出ls -al的效果，但因为这是CMD命令，-l替换了CMD命令，-l不是命令所以报错了
+[root@VM-0-14-centos dockerfile]# docker run cc2edd92a3e0 -l
+docker: Error response from daemon: OCI runtime create failed: container_linux.go:296: starting container process caused "exec: \"-l\": executable file not found in $PATH": unknown.
+[root@VM-0-14-centos dockerfile]# docker run cc2edd92a3e0 ls -al
+[目录 略]
+#这样就能输出了
+```
+
+**ENTRYPOINT的效果**
+
+```shell
+[root@VM-0-14-centos dockerfile]# cat dockerfile-cmd-entrypoint 
+FROM centos
+ENTRYPOINT ["ls","-a"]
+[root@VM-0-14-centos dockerfile]# docker build -f dockerfile-cmd-entrypoint -t eptest .
+[root@VM-0-14-centos dockerfile]# docker run c42c343bedae
+[输出了ls -a的效果]
+[root@VM-0-14-centos dockerfile]# docker run c42c343bedae -l
+[输出了ls -al的效果]
+```
+
+**DockerFile中很多命令都非常相似，我们需要了解他们的区别，最好的学习方法就是对比然后测试**
+
+
+
+### Tomcat实战
+
+1. 准备镜像文件，tomcat压缩包，jdk的压缩包
+2. 编写dockerfile文件
+3. 构建镜像
+
+**在编写的时候使用官方的 Dockerfile 这个名字就可以不指定-f，build会默认寻找这个文件**
+
+```shell
+[root@VM-0-14-centos build]# cat Dockerfile 
+FROM centos
+MAINTAINER jiemoo<978090944@qq.com>
+
+COPY readme.txt /usr/local/readme.txt
+ADD apache-tomcat-9.0.39.tar.gz /usr/local/
+#还有一个jdk的不过没下载到 添加方法同上
+
+RUN yum -y install vim
+
+ENV MYPATH /usr/local
+WORKDIR $MYPATH
+
+ENV JAVA_HOME /usr/local/jdk1.8.0_11
+ENV CLASSPATH $JAVA_HOME/lib/dt.jar:$JAVA_HOME/lib/tools.jar
+ENV CATALINA_HOME /usr/local/apache-tomcat-9.0.39
+ENV CATALINA_BASH /usr/local/apache-tomcat-9.0.39
+ENV PATH $PATH:$JAVA_HOME/bin:$CATALINA_HOME/lib:$CATALINA_HOME/bin
+
+EXPOSE 8080
+
+CMD /usr/local/apache-tomcat-9.0.39/bin/startup.sh && tail -F /usr/local/apache-tomcat-9.0.39/bin/logs/catalina.out
+
+[root@VM-0-14-centos build]# docker build -t diytomcat .
+Successfully built f613a52ee819
+Successfully tagged diytomcat:latest
+
+```
+
+
+
+### 发布自己的镜像
+
+**发布到Docker Hub**
+
+1. 注册docker账号
+2. 登陆docker账号
+
+```shell
+#不建议的方式
+[root@VM-0-14-centos test]# docker login -u [账号] -p [密码]
+
+#建议
+[root@VM-0-14-centos test]# docker login -u [账号]
+Password: [你的密码]
+Login Succeeded
+
+
+#push
+[root@VM-0-14-centos test]# docker push jiemoo/centos:1.0
+
+```
+
+阿里云和腾讯云可以到对应网站控制台自行查询 网站上有完整流程
+
+
+
+<img src="Docker学习记录.assets/image-20201112202405722.png" alt="image-20201112202405722" style="zoom:80%;" />
+
 
 
 
@@ -1473,6 +1724,198 @@ dockerfile是用来构建docker镜像的文件，就是命令参数脚本
 
 
 ## Docker网络原理
+
+### 理解Docker0
+
+清空镜像
+
+![image-20201112203726962](Docker学习记录.assets/image-20201112203726962.png)
+
+这里有三个网卡
+
+**问题：Docker 是怎么样处理容器访问的？**
+
+```shell
+#启动一个tomcat作为测试
+[root@VM-0-14-centos test]# docker run -d -P --name tomcat01 tomcat
+[root@VM-0-14-centos test]# docker exec -it tomcat01 ip addr
+1: lo: <LOOPBACK,UP,LOWER_UP> mtu 65536 qdisc noqueue state UNKNOWN group default qlen 1000
+    link/loopback 00:00:00:00:00:00 brd 00:00:00:00:00:00
+    inet 127.0.0.1/8 scope host lo
+       valid_lft forever preferred_lft forever
+80: eth0@if81: <BROADCAST,MULTICAST,UP,LOWER_UP> mtu 1500 qdisc noqueue state UP group default 
+    link/ether 02:42:ac:11:00:02 brd ff:ff:ff:ff:ff:ff link-netnsid 0
+    inet 172.17.0.2/16 brd 172.17.255.255 scope global eth0
+       valid_lft forever preferred_lft forever
+
+#这里我们可以发现有一个eth0@if81 172.17.0.2，这是docker分配的
+#那么linux能不能ping通这个容器内部呢？
+[root@VM-0-14-centos test]# ping 172.17.0.2
+PING 172.17.0.2 (172.17.0.2) 56(84) bytes of data.
+64 bytes from 172.17.0.2: icmp_seq=1 ttl=64 time=0.076 ms
+64 bytes from 172.17.0.2: icmp_seq=2 ttl=64 time=0.038 ms
+64 bytes from 172.17.0.2: icmp_seq=3 ttl=64 time=0.051 ms
+64 bytes from 172.17.0.2: icmp_seq=4 ttl=64 time=0.041 ms
+--- 172.17.0.2 ping statistics ---
+4 packets transmitted, 4 received, 0% packet loss, time 2999ms
+rtt min/avg/max/mdev = 0.038/0.051/0.076/0.016 ms
+
+#当然是可以的
+```
+
+我们每启动一个docker容器，docker就会给docker容器分配一个ip，我们只要安装了docker，就会有一个网卡docker0。
+
+桥接模式使用的技术是veth-pair技术
+
+现在我们再回到主机上，使用ip addr命令
+
+```shell
+[root@VM-0-14-centos test]# ip addr
+1: lo: <LOOPBACK,UP,LOWER_UP> mtu 65536 qdisc noqueue state UNKNOWN group default qlen 1000
+    link/loopback 00:00:00:00:00:00 brd 00:00:00:00:00:00
+    inet 127.0.0.1/8 scope host lo
+       valid_lft forever preferred_lft forever
+    inet6 ::1/128 scope host 
+       valid_lft forever preferred_lft forever
+2: eth0: <BROADCAST,MULTICAST,UP,LOWER_UP> mtu 1500 qdisc pfifo_fast state UP group default qlen 1000
+    link/ether 52:54:00:05:88:f7 brd ff:ff:ff:ff:ff:ff
+    inet 172.16.0.14/20 brd 172.16.15.255 scope global eth0
+       valid_lft forever preferred_lft forever
+    inet6 fe80::5054:ff:fe05:88f7/64 scope link 
+       valid_lft forever preferred_lft forever
+3: docker0: <BROADCAST,MULTICAST,UP,LOWER_UP> mtu 1500 qdisc noqueue state UP group default 
+    link/ether 02:42:46:58:16:c8 brd ff:ff:ff:ff:ff:ff
+    inet 172.17.0.1/16 brd 172.17.255.255 scope global docker0
+       valid_lft forever preferred_lft forever
+    inet6 fe80::42:46ff:fe58:16c8/64 scope link 
+       valid_lft forever preferred_lft forever
+81: veth4344eb5@if80: <BROADCAST,MULTICAST,UP,LOWER_UP> mtu 1500 qdisc noqueue master docker0 state UP group default 
+    link/ether 9a:75:7b:94:4c:9c brd ff:ff:ff:ff:ff:ff link-netnsid 0
+    inet6 fe80::9875:7bff:fe94:4c9c/64 scope link 
+       valid_lft forever preferred_lft forever
+
+```
+
+可以发现这里有一个网卡81，他连接的是80，也就是刚才那个容器的网卡编号
+
+
+
+那我们再启动一个tomcat02，再查看ip addr
+
+![image-20201112205438324](Docker学习记录.assets/image-20201112205438324.png)
+
+又多了一对82 83网卡。
+
+我们可以发现，网卡都是一对出现的
+
+veth-pair 就是一对的虚拟设备接口，他们都是成对出现的，一端连着协议，一端彼此相连
+
+因为这个特性，一般我们使用 veth-pair 作为一个桥梁，连接各种虚拟网络设备的
+
+Docker容器之间的通讯，都是使用 veth-pair 技术
+
+```shell
+#尝试在tomcat02 ping tomcat01
+[root@VM-0-14-centos test]# docker exec -it tomcat02 ping 172.17.0.2
+PING 172.17.0.2 (172.17.0.2) 56(84) bytes of data.
+64 bytes from 172.17.0.2: icmp_seq=1 ttl=64 time=0.101 ms
+64 bytes from 172.17.0.2: icmp_seq=2 ttl=64 time=0.090 ms
+64 bytes from 172.17.0.2: icmp_seq=3 ttl=64 time=0.067 ms
+^C
+--- 172.17.0.2 ping statistics ---
+3 packets transmitted, 3 received, 0% packet loss, time 4ms
+rtt min/avg/max/mdev = 0.067/0.086/0.101/0.014 ms
+
+```
+
+**结论**
+
+容器之间是可以互相ping通的
+
+<img src="Docker学习记录.assets/image-20201112210645690.png" alt="image-20201112210645690" style="zoom:80%;" />
+
+所有的网络在不指定--net的情况下都是由docker0来路由的，docker会给每个容器分配一个默认的可用ip
+
+Docker使用的是Linux的桥接，宿主机中是一个docker容器的网桥docker0
+
+<img src="Docker学习记录.assets/image-20201112211130751.png" alt="image-20201112211130751" style="zoom:80%;" />
+
+Docker中所有的网络接口都是虚拟的，因为虚拟的转发效率高。
+
+只要容器删除，对应的一对网桥就也会被删除。
+
+
+
+### --link
+
+> 思考一个场景，假设现在我们的服务器重启了，所有容器重新启动，那么ip地址就会改变，那么就有可能出现绑定的ip失效的问题，那么能不能通过容器名字来进行绑定呢？
+
+```shell
+[root@VM-0-14-centos test]# docker exec -it tomcat01 ping tomcat01
+ping: tomcat01: Name or service not known
+```
+
+**直接这样写是不行的，那么如何解决？**
+
+```shell
+#创建一个tomcat03  通过--link 容器 和要绑定的容器连接
+[root@VM-0-14-centos test]# docker run -d -P --name tomcat03 --link tomcat02 tomcat
+10702cb4bda7abdc1c51cf445016f45b3679750f783f7dc33b163728f82458c2
+
+#现在再ping就可以ping通了
+[root@VM-0-14-centos test]# docker exec -it tomcat03 ping tomcat02
+PING tomcat02 (172.17.0.3) 56(84) bytes of data.
+64 bytes from tomcat02 (172.17.0.3): icmp_seq=1 ttl=64 time=0.108 ms
+64 bytes from tomcat02 (172.17.0.3): icmp_seq=2 ttl=64 time=0.059 ms
+64 bytes from tomcat02 (172.17.0.3): icmp_seq=3 ttl=64 time=0.067 ms
+^C
+--- tomcat02 ping statistics ---
+3 packets transmitted, 3 received, 0% packet loss, time 4ms
+rtt min/avg/max/mdev = 0.059/0.078/0.108/0.021 ms
+
+#那么反向可以ping通吗？
+[root@VM-0-14-centos test]# docker exec -it tomcat02 ping tomcat03
+ping: tomcat03: Name or service not known
+
+#不行 因为docker没有 --link tomcat03
+```
+
+虽然这种方法看着能解决问题，但实际上非常不方便
+
+```shell
+#使用docker network ls 查看连接情况
+[root@VM-0-14-centos test]# docker network ls
+NETWORK ID          NAME                DRIVER              SCOPE
+71d17c91aea2        bridge              bridge              local
+3eb81acfc887        host                host                local
+3fcb64271f15        none                null                local
+
+[root@VM-0-14-centos test]# docker network inspect 71d17c91aea2
+```
+
+![image-20201112212821727](Docker学习记录.assets/image-20201112212821727.png)
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 ## IDEA整合Docker
 
