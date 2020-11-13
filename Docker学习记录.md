@@ -393,7 +393,7 @@ CONTAINER ID        IMAGE               COMMAND             CREATED             
 fa4d14c5a7cc
 ```
 
-#### **退出容器**
+#### 退出容器
 
 ```shell
 exit  # 直接容器停止并退出
@@ -1268,7 +1268,7 @@ local               c88947b8f06a27e3ee53008a78ab5656258f183341a6060aad5696fcefca
 
 
 
-### **如何确定是匿名挂载还是指定路径挂载？**
+### 如何确定是匿名挂载还是指定路径挂载？
 
 ```shell
 -v 容器内路径                #匿名挂载
@@ -1923,7 +1923,7 @@ NETWORK ID          NAME                DRIVER              SCOPE
 
 
 
-### **探究**
+### 探究
 
 tomcat3到底是以何种方式与tomcat2相连的？
 
@@ -1991,13 +1991,342 @@ Run 'docker network COMMAND --help' for more information on a command.
 
 ```
 
+**网络模式：**
+
+bridge：桥接模式（默认）自己创建也是使用桥接模式
+
+none：不配置网络
+
+host：主机模式 和宿主机共享网络
+
+container：和容器内网络连通（用的少）容器之间直接互联 但局限很大
+
+**测试**
+
+```shell
+[root@VM-0-14-centos ~]# docker run -d -P --name tomcat01 --net bridge tomcat
+```
+
+这个命令和我们之前启动的是一样的，因为默认就是 --net bridge 也就是docker0
+
+docker0特点：
+
+- 默认
+- 域名不能访问
+- --link可以打通连接
+
+
+
+
+
+### 自定义网络
+
+```shell
+[root@VM-0-14-centos ~]# docker network create --help
+
+Usage:  docker network create [OPTIONS] NETWORK
+
+Create a network
+
+Options:
+      --attachable           Enable manual container attachment
+      --aux-address map      Auxiliary IPv4 or IPv6 addresses used by Network driver (default
+                             map[])
+      --config-from string   The network from which copying the configuration
+      --config-only          Create a configuration only network
+  -d, --driver string        Driver to manage the Network (default "bridge")
+      --gateway strings      IPv4 or IPv6 Gateway for the master subnet
+      --ingress              Create swarm routing-mesh network
+      --internal             Restrict external access to the network
+      --ip-range strings     Allocate container ip from a sub-range
+      --ipam-driver string   IP Address Management Driver (default "default")
+      --ipam-opt map         Set IPAM driver specific options (default map[])
+      --ipv6                 Enable IPv6 networking
+      --label list           Set metadata on a network
+  -o, --opt map              Set driver specific options (default map[])
+      --scope string         Control the network's scope
+      --subnet strings       Subnet in CIDR format that represents a network segment
+
+```
+
+
+
+```shell
+[root@VM-0-14-centos ~]# docker network create -d bridge --subnet 192.168.0.0/16 --gateway 192.168.0.1 mynet
+edc68cd6b4a1eba9c544b9f719b31783f3d50c099e6b9fd3b4491487e7b5cba9
+# -d bridge
+# --subnet 192.168.0.0/16  子网
+# --gateway 192.168.0.1    网关
+
+[root@VM-0-14-centos ~]# docker network ls
+NETWORK ID          NAME                DRIVER              SCOPE
+71d17c91aea2        bridge              bridge              local
+3eb81acfc887        host                host                local
+edc68cd6b4a1        mynet               bridge              local
+3fcb64271f15        none                null                local
+
+[root@VM-0-14-centos ~]# docker network inspect mynet
+[
+    {
+        "Name": "mynet",
+        "Id": "edc68cd6b4a1eba9c544b9f719b31783f3d50c099e6b9fd3b4491487e7b5cba9",
+        "Created": "2020-11-13T14:56:17.803238411+08:00",
+        "Scope": "local",
+        "Driver": "bridge",
+        "EnableIPv6": false,
+        "IPAM": {
+            "Driver": "default",
+            "Options": {},
+            "Config": [
+                {
+                    "Subnet": "192.168.0.0/16",
+                    "Gateway": "192.168.0.1"
+                }
+            ]
+        },
+        "Internal": false,
+        "Attachable": false,
+        "Ingress": false,
+        "ConfigFrom": {
+            "Network": ""
+        },
+        "ConfigOnly": false,
+        "Containers": {},
+        "Options": {},
+        "Labels": {}
+    }
+]
+
+```
+
+我们自己的网络这就创建好了，接下来怎么使用呢？
+
+```shell
+[root@VM-0-14-centos ~]# docker run -d -P --name tomcat-mynet-01 --net mynet tomcat
+a8c950d9540cd84c194ccd0080ab0493b89cbbfbcf2f7a1cda2d64a3d3ef94bc
+[root@VM-0-14-centos ~]# docker run -d -P --name tomcat-mynet-02 --net mynet tomcat
+c0d893ae5233f7fbdb1a13e8c04927266dfff66a9f6e8af4ff1f216db1345572
+
+
+[root@VM-0-14-centos ~]# docker network inspect mynet
+
+```
+
+<img src="Docker学习记录.assets/image-20201113150437402.png" alt="image-20201113150437402" style="zoom:80%;" />
+
+<img src="Docker学习记录.assets/image-20201113150640772.png" alt="image-20201113150640772" style="zoom:80%;" />
+
+现在直接ping 02的IP也是可以的，直接ping 02的容器名也是可以的！
+
+现在就不需要--link来连接了。我们自定义的网络docker都已经帮我们维护好了对应的关系。
+
+
+
+**好处**：不同的集群使用不同的网络，保证集群的安全和健康
+
+
+
+
+
+### 网络的连通
+
+核心命令：
+
+<img src="Docker学习记录.assets/image-20201113151702524.png" alt="image-20201113151702524" style="zoom:80%;" />
+
+搭建环境：
+
+```shell
+[root@VM-0-14-centos ~]# docker ps
+CONTAINER ID        IMAGE               COMMAND             CREATED             STATUS              PORTS                     NAMES
+f941cb169b06        tomcat              "catalina.sh run"   3 seconds ago       Up 2 seconds        0.0.0.0:32778->8080/tcp   tomcat02
+954303276a38        tomcat              "catalina.sh run"   8 seconds ago       Up 7 seconds        0.0.0.0:32777->8080/tcp   tomcat01
+c0d893ae5233        tomcat              "catalina.sh run"   16 minutes ago      Up 16 minutes       0.0.0.0:32776->8080/tcp   tomcat-mynet-02
+a8c950d9540c        tomcat              "catalina.sh run"   16 minutes ago      Up 16 minutes       0.0.0.0:32775->8080/tcp   tomcat-mynet-01
+
+```
+
+其中tomcat01 02是默认的docker0网络
+
+tomcat-mynet-01 tomcat-mynet-02使用mynet网络
+
+他们现在毫无疑问是不能ping通的
+
+所以我们需要：
+
+<img src="Docker学习记录.assets/image-20201113152035382.png" alt="image-20201113152035382" style="zoom:80%;" />
+
+**测试**
+
+```shell
+[root@VM-0-14-centos ~]# docker network connect mynet tomcat01
+[root@VM-0-14-centos ~]# docker network inspect mynet 
+```
+
+<img src="Docker学习记录.assets/image-20201113152315643.png" alt="image-20201113152315643" style="zoom:80%;" />
+
+可以看到tomcat01被添加进mynet网络中了
+
+**一个容器两个ip地址**
+
+```shell
+[root@VM-0-14-centos ~]# docker inspect tomcat01
+```
+
+<img src="Docker学习记录.assets/image-20201113152608848.png" alt="image-20201113152608848" style="zoom:80%;" />
+
+同一个网络下自然也是可以ping通的
+
+<img src="Docker学习记录.assets/image-20201113152803464.png" alt="image-20201113152803464" style="zoom:80%;" />
+
+tomcat02没有被添加到mynet中自然也就ping不通 tomcat-mynet-0X 了
+
+
+
+**结论**
+
+假设要跨网络操作别人，就需要使用docker network connect 连通！
+
+
+
+
+
+### 实战：部署Redis集群
+
+```shell
+[root@VM-0-14-centos ~]# docker network create redis --subnet 172.38.0.0/16
+
+#脚本创建节点
+for port in $(seq 1 6);\
+do \
+mkdir -p /mydata/redis/node-${port}/conf
+touch /mydata/redis/node-${port}/conf/redis.conf
+cat << EOF >/mydata/redis/node-${port}/conf/redis.conf
+port 6379
+bind 0.0.0.0
+cluster-enabled yes
+cluster-config-file nodes.conf
+cluster-node-timeout 5000
+cluster-announce-ip 172.38.0.1${port}
+cluster-announce-port 6379
+cluster-announce-bus-port 16379
+appendonly yes
+EOF
+done
+
+#启动docker
+docker run -p 637${port}:6379 -p 1637${port}:16379 --name redis-${port} \
+-v /mydata/redis/node-${port}/data:/data \
+-v /mydata/redis/node-${port}/conf/redis.conf:/etc/redis/redis.conf \
+-d --net redis --ip 172.38.0.1${port} redis:5.0.9-alpine3.11 redis-server /etc/redis/redis.conf;\
+
+
+docker run -p 6371:6379 -p 16371:16379 --name redis-1 \
+-v/mydata/redis/node-1/data:/data \
+-v/mydata/redis/node-1/conf/redis.conf:/etc/redis/redis.conf \
+-d --net redis --ip 172.38.0.11 redis:5.0.9-alpine3.11 redis-server /etc/redis/redis.conf
+
+docker run -p 6376:6379 -p 16376:16379 --name redis-6 \
+-v/mydata/redis/node-6/data:/data \
+-v/mydata/redis/node-6/conf/redis.conf:/etc/redis/redis.conf \
+-d --net redis --ip 172.38.0.16 redis:5.0.9-alpine3.11 redis-server /etc/redis/redis.conf
+
+[以下略]
+
+#创建集群
+docker exec -it redis-1 /bin/sh
+
+redis-cli --cluster create 172.38.0.11:6379 172.38.0.12:6379 172.38.0.13:6379 172.38.0.14:6379 172.38.0.15:6379 172.38.0.16:6379 --cluster-replicas 1
+[输入yes]
+>>> Nodes configuration updated
+>>> Assign a different config epoch to each node
+>>> Sending CLUSTER MEET messages to join the cluster
+Waiting for the cluster to join
+...
+>>> Performing Cluster Check (using node 172.38.0.11:6379)
+M: 0494c7fc196e804e88409386602bca669dd76e77 172.38.0.11:6379
+   slots:[0-5460] (5461 slots) master
+   1 additional replica(s)
+S: a5841960b0145889274896a5c8fa3658ffb76ef6 172.38.0.14:6379
+   slots: (0 slots) slave
+   replicates 66a6dda66be2f49125f82c0d41832ba8ae1c79bc
+M: 60f488092edf13f75eef2f0a349481cad972640c 172.38.0.12:6379
+   slots:[5461-10922] (5462 slots) master
+   1 additional replica(s)
+S: 0f1a400e07e6f1bdf25014cee16b6bd426fffa60 172.38.0.15:6379
+   slots: (0 slots) slave
+   replicates 0494c7fc196e804e88409386602bca669dd76e77
+S: 8072adbda00933f1bf44c30d81de4866d3f7be1a 172.38.0.16:6379
+   slots: (0 slots) slave
+   replicates 60f488092edf13f75eef2f0a349481cad972640c
+M: 66a6dda66be2f49125f82c0d41832ba8ae1c79bc 172.38.0.13:6379
+   slots:[10923-16383] (5461 slots) master
+   1 additional replica(s)
+[OK] All nodes agree about slots configuration.
+>>> Check for open slots...
+>>> Check slots coverage...
+[OK] All 16384 slots covered.
+
+#查看集群信息
+/data # redis-cli -c
+127.0.0.1:6379> cluster info
+cluster_state:ok
+cluster_slots_assigned:16384
+cluster_slots_ok:16384
+cluster_slots_pfail:0
+cluster_slots_fail:0
+cluster_known_nodes:6
+cluster_size:3
+cluster_current_epoch:6
+cluster_my_epoch:1
+cluster_stats_messages_ping_sent:330
+cluster_stats_messages_pong_sent:333
+cluster_stats_messages_sent:663
+cluster_stats_messages_ping_received:328
+cluster_stats_messages_pong_received:330
+cluster_stats_messages_meet_received:5
+cluster_stats_messages_received:663
+127.0.0.1:6379> cluster nodes
+a5841960b0145889274896a5c8fa3658ffb76ef6 172.38.0.14:6379@16379 slave 66a6dda66be2f49125f82c0d41832ba8ae1c79bc 0 1605261451523 4 connected
+60f488092edf13f75eef2f0a349481cad972640c 172.38.0.12:6379@16379 master - 0 1605261450523 2 connected 5461-10922
+0f1a400e07e6f1bdf25014cee16b6bd426fffa60 172.38.0.15:6379@16379 slave 0494c7fc196e804e88409386602bca669dd76e77 0 1605261451723 5 connected
+8072adbda00933f1bf44c30d81de4866d3f7be1a 172.38.0.16:6379@16379 slave 60f488092edf13f75eef2f0a349481cad972640c 0 1605261449721 6 connected
+0494c7fc196e804e88409386602bca669dd76e77 172.38.0.11:6379@16379 myself,master - 0 1605261450000 1 connected 0-5460
+66a6dda66be2f49125f82c0d41832ba8ae1c79bc 172.38.0.13:6379@16379 master - 0 1605261450722 3 connected 10923-16383
+
+
+127.0.0.1:6379> set a b
+-> Redirected to slot [15495] located at 172.38.0.13:6379
+OK
+#可以看到他放在了3号机上，这时我们停掉3号的容器，应该会在3号的从机里面应该也有这个值
+[root@VM-0-14-centos ~]# docker stop redis-3
+127.0.0.1:6379> get a
+-> Redirected to slot [15495] located at 172.38.0.14:6379
+"b"
+```
+
+<img src="Docker学习记录.assets/image-20201113180813692.png" alt="image-20201113180813692" style="zoom:80%;" />
 
 
 
 
 
 
-## IDEA整合Docker
+
+
+
+## Docker工程交付
+
+**大致流程：**
+
+1. 开发完代码
+2. 编写DockerFile
+3. docker build
+4. docker run
+
+
+
+
 
 ## Docker Compose
 
