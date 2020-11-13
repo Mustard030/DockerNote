@@ -1,3 +1,9 @@
+[TOC]
+
+------
+
+
+
 ##  Docker安装
 
 #### Docker的基本组成
@@ -185,6 +191,10 @@ DockerServer接收到Docker-Client的指令，就会执行这个命令。
 ![image-20201109000059802](Docker学习记录.assets/image-20201109000059802.png)
 
 
+
+
+
+------
 
 
 
@@ -949,11 +959,11 @@ docker run -d -p 8088:9000 \
 
 
 
-
-
 - Rancher
 
 
+
+------
 
 
 
@@ -1067,6 +1077,12 @@ portainer/portainer   latest              62771b0b9b09        3 months ago      
 
 #将刚才的容器通过commit提交为一个新的镜像，以后就可以使用我们自己修改过的镜像了
 ```
+
+
+
+
+
+------
 
 
 
@@ -1447,6 +1463,8 @@ docker01
 
 
 
+------
+
 
 
 ## DockerFile
@@ -1719,7 +1737,7 @@ Login Succeeded
 
 
 
-
+------
 
 
 
@@ -1735,8 +1753,9 @@ Login Succeeded
 
 **问题：Docker 是怎么样处理容器访问的？**
 
+启动一个tomcat作为测试
+
 ```shell
-#启动一个tomcat作为测试
 [root@VM-0-14-centos test]# docker run -d -P --name tomcat01 tomcat
 [root@VM-0-14-centos test]# docker exec -it tomcat01 ip addr
 1: lo: <LOOPBACK,UP,LOWER_UP> mtu 65536 qdisc noqueue state UNKNOWN group default qlen 1000
@@ -1760,8 +1779,9 @@ PING 172.17.0.2 (172.17.0.2) 56(84) bytes of data.
 4 packets transmitted, 4 received, 0% packet loss, time 2999ms
 rtt min/avg/max/mdev = 0.038/0.051/0.076/0.016 ms
 
-#当然是可以的
 ```
+
+**当然是可以的**
 
 我们每启动一个docker容器，docker就会给docker容器分配一个ip，我们只要安装了docker，就会有一个网卡docker0。
 
@@ -1808,7 +1828,7 @@ rtt min/avg/max/mdev = 0.038/0.051/0.076/0.016 ms
 
 我们可以发现，网卡都是一对出现的
 
-veth-pair 就是一对的虚拟设备接口，他们都是成对出现的，一端连着协议，一端彼此相连
+**veth-pair 就是一对的虚拟设备接口，他们都是成对出现的，一端连着协议，一端彼此相连**
 
 因为这个特性，一般我们使用 veth-pair 作为一个桥梁，连接各种虚拟网络设备的
 
@@ -1842,7 +1862,9 @@ Docker使用的是Linux的桥接，宿主机中是一个docker容器的网桥doc
 
 Docker中所有的网络接口都是虚拟的，因为虚拟的转发效率高。
 
-只要容器删除，对应的一对网桥就也会被删除。
+**只要容器删除，对应的一对网桥就也会被删除。**
+
+
 
 
 
@@ -1895,21 +1917,79 @@ NETWORK ID          NAME                DRIVER              SCOPE
 
 ![image-20201112212821727](Docker学习记录.assets/image-20201112212821727.png)
 
+<img src="Docker学习记录.assets/image-20201113135903330.png" alt="image-20201113135903330" style="zoom:80%;" />
 
 
 
 
 
+### **探究**
+
+tomcat3到底是以何种方式与tomcat2相连的？
+
+```shell
+[root@VM-0-14-centos ~]# docker exec -it tomcat3 cat /etc/hosts
+127.0.0.1       localhost
+::1     localhost ip6-localhost ip6-loopback
+fe00::0 ip6-localnet
+ff00::0 ip6-mcastprefix
+ff02::1 ip6-allnodes
+ff02::2 ip6-allrouters
+#看这行
+172.17.0.3      tomcat02 6d841f8f494a
+172.17.0.4      10702cb4bda7
+```
+
+可以看到在tomcat3的host文件中直接把tomcat2的转发写死在host中了
+
+**--link其实就是在hosts配置中增加了一个tomcat2的映射(或者叫路由？)**
+
+```shell
+[root@VM-0-14-centos ~]# docker exec -it tomcat02 cat /etc/hosts
+127.0.0.1       localhost
+::1     localhost ip6-localhost ip6-loopback
+fe00::0 ip6-localnet
+ff00::0 ip6-mcastprefix
+ff02::1 ip6-allnodes
+ff02::2 ip6-allrouters
+172.17.0.3      6d841f8f494a
+#在tomcat02中是看不到tomcat03这条映射的 因为我们在创建的时候没有--link tomcat03
+```
+
+现在的docker开发中**不建议**使用--link了，因为直接写在host中太笨重了。
+
+我们需要自定义网络，而不是通过docker0转发！
+
+**docker0的问题：**不支持容器名连接访问
 
 
 
+### 自定义网络(容器互联)
 
 
 
+```shell
+[root@VM-0-14-centos ~]# docker network --help 
+
+Usage:  docker network COMMAND
+
+Manage networks
+
+Options:
 
 
+Commands:
+  connect     Connect a container to a network
+  create      Create a network
+  disconnect  Disconnect a container from a network
+  inspect     Display detailed information on one or more networks
+  ls          List networks
+  prune       Remove all unused networks
+  rm          Remove one or more networks
 
+Run 'docker network COMMAND --help' for more information on a command.
 
+```
 
 
 
