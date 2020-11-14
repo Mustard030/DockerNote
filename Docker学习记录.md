@@ -2330,6 +2330,239 @@ OK
 
 ## Docker Compose
 
+### 简介
+
+非常多的容器要启动的情况下，不可能手动启停。
+
+Docker Compose 来轻松高效管理容器，定义多个容器的运行。
+
+官方介绍：
+
+> Compose is a tool for defining and running multi-container Docker applications. With Compose, you use a YAML file to configure your application’s services. Then, with a single command, you create and start all the services from your configuration. To learn more about all the features of Compose, see [the list of features](https://docs.docker.com/compose/#features).
+>
+> Compose works in all environments: production, staging, development, testing, as well as CI workflows. You can learn more about each case in [Common Use Cases](https://docs.docker.com/compose/#common-use-cases).
+>
+> Using Compose is basically a three-step process:
+>
+> 1. Define your app’s environment with a `Dockerfile` so it can be reproduced anywhere.
+> 2. Define the services that make up your app in `docker-compose.yml` so they can be run together in an isolated environment.
+> 3. Run `docker-compose up` and Compose starts and runs your entire app.
+
+从上文可知：
+
+- 我们需要dockerfile来运行每个容器
+- 需要有一个服务（？）
+- 通过`docker-compose.yml`文件管理
+- 使用`docker-compose up`启动项目
+
+
+
+docker compose是docker官方开源的一个项目，需要安装
+
+
+
+`docker-compose.yml`文档怎么写？
+
+A `docker-compose.yml` looks like this:
+
+```yaml
+version: "3.8"
+services:            #服务
+  web:				#web服务
+    build: .
+    ports:
+      - "5000:5000"
+    volumes:
+      - .:/code
+      - logvolume01:/var/log
+    links:			#连接redis
+      - redis
+  redis:			#redis服务
+    image: redis
+volumes:		#挂载
+  logvolume01: {}
+```
+
+docker-compose up 可以一次启动n个服务
+
+Compose重要概念
+
+- 服务services，容器，应用（web、redis、mysql。。。）。
+- 项目project 一组关联的容器。
+
+
+
+### 安装Compose
+
+打开：https://docs.docker.com/compose/install/
+
+1、下载
+
+```shell
+#官方的 比较慢
+sudo curl -L "https://github.com/docker/compose/releases/download/1.27.4/docker-compose-$(uname -s)-$(uname -m)" -o /usr/local/bin/docker-compose
+
+#国内的 可能快点
+curl -L https://get.daocloud.io/docker/compose/releases/download/1.27.4/docker-compose-'uname -s'-'uname -m' > /usr/local/bin/docker-compose
+```
+
+2、给权限
+
+```shell
+sudo chmod +x /usr/local/bin/docker-compose
+```
+
+3、体验
+
+https://docs.docker.com/compose/gettingstarted/
+
+创建文件夹
+
+```shell
+$ mkdir composetest
+$ cd composetest
+```
+
+创建`app.py`文件
+
+```python
+import time
+
+import redis
+from flask import Flask
+
+app = Flask(__name__)
+cache = redis.Redis(host='redis', port=6379)
+
+def get_hit_count():
+    retries = 5
+    while True:
+        try:
+            return cache.incr('hits')
+        except redis.exceptions.ConnectionError as exc:
+            if retries == 0:
+                raise exc
+            retries -= 1
+            time.sleep(0.5)
+
+@app.route('/')
+def hello():
+    count = get_hit_count()
+    return 'Hello World! I have been seen {} times.\n'.format(count)
+```
+
+创建`requirements.txt`
+
+```
+flask
+redis
+```
+
+创建`Dockerfile`
+
+```dockerfile
+FROM python:3.7-alpine
+WORKDIR /code
+ENV FLASK_APP=app.py
+ENV FLASK_RUN_HOST=0.0.0.0
+RUN apk add --no-cache gcc musl-dev linux-headers
+COPY requirements.txt requirements.txt
+RUN pip install -r requirements.txt
+EXPOSE 5000
+COPY . .
+CMD ["flask", "run"]
+```
+
+> This tells Docker to:
+>
+> - Build an image starting with the Python 3.7 image.
+> - Set the working directory to `/code`.
+> - Set environment variables used by the `flask` command.
+> - Install gcc and other dependencies
+> - Copy `requirements.txt` and install the Python dependencies.
+> - Add metadata to the image to describe that the container is listening on port 5000
+> - Copy the current directory `.` in the project to the workdir `.` in the image.
+> - Set the default command for the container to `flask run`.
+>
+> For more information on how to write Dockerfiles, see the [Docker user guide](https://docs.docker.com/develop/) and the [Dockerfile reference](https://docs.docker.com/engine/reference/builder/).
+
+创建`docker-compose.yml`
+
+```yaml
+version: "3.8"
+services:
+  web:
+    build: .
+    ports:
+      - "5000:5000"
+  redis:
+    image: "redis:alpine"
+```
+
+build 然后 run 这个应用
+
+```shell
+$ docker-compose up
+```
+
+
+
+
+
+**docker compose启动流程**
+
+创建网络
+
+执行yaml文件
+
+启动服务
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 ## Docker Swarm
+
+集群方式部署
 
 ## CI\CD Jenkins
