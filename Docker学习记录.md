@@ -2412,7 +2412,11 @@ curl -L https://get.daocloud.io/docker/compose/releases/download/1.27.4/docker-c
 sudo chmod +x /usr/local/bin/docker-compose
 ```
 
-3、体验
+
+
+
+
+### 体验
 
 https://docs.docker.com/compose/gettingstarted/
 
@@ -2503,7 +2507,10 @@ build 然后 run 这个应用
 
 ```shell
 $ docker-compose up
+# docker-compose up --build #会重新build项目
 ```
+
+因为docker compose会在创建的时候自动把应用归属到同一个网络中，所以我们可以直接使用域名访问
 
 
 
@@ -2523,35 +2530,37 @@ $ docker-compose up
 
 
 
+### yaml规则
 
+docker-compose.yaml 是集群的核心
 
+https://docs.docker.com/compose/compose-file/
 
+它可以看作是分成3层
 
+```yaml
 
+version:"" #版本
 
+service:   #服务
+	服务1:web
+        #服务配置
+        images
+        build
+        network
+        ······
+    
+	服务2:redis
+		······
+		
+	······
+	
+#其他配置  网络、卷挂载、全局规则
+Volumes:
+networks:
+configs:
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
+```
 
 
 
@@ -2564,5 +2573,11 @@ $ docker-compose up
 ## Docker Swarm
 
 集群方式部署
+
+
+
+
+
+
 
 ## CI\CD Jenkins
