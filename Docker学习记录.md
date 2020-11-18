@@ -2574,6 +2574,86 @@ configs:
 
 集群方式部署
 
+命令自行--help查看
+
+无力购买4台服务器测试截图
+
+启动一个swarm服务
+
+docker swarm init
+
+主要实现动态扩缩容 docker swarm scale 服务名=num
+
+和区分管理者和工作者的概念
+
+以及raft协议
+
+可以直接学习k8s
+
+![image-20201118175240071](Docker学习记录.assets/image-20201118175240071.png)
+
+![image-20201118175409377](Docker学习记录.assets/image-20201118175409377.png)
+
+![image-20201118175504107](Docker学习记录.assets/image-20201118175504107.png)
+
+
+
+**swarm**
+
+集群的管理和编排，docker可以初始化一个swarm集群，其他节点可以加入
+
+**node**
+
+就是一个docker节点，多个节点就是一个网络集群
+
+**service**
+
+任务，可以在管理节点或者工作节点运行
+
+**task**
+
+容器内的命令，细节任务
+
+
+
+
+
+**Swarm网络**
+
+overlay
+
+ingress：特殊的overlay，具有负载均衡 ipvs vip
+
+虽然docker在4台机器上，实际是同一个网络
+
+
+
+
+
+
+
+## Docker Stack
+
+docker-compose 单机部署项目
+
+Docker stack 集群部署
+
+```shell
+#单机
+docker-compose up -d wordpress.yml
+
+#集群
+docker stack depoly wordpress.yml
+
+#docker-compose 文件主要核心在于deploy项
+```
+
+
+
+## Docker Secret
+
+安全，配置密码，证书之类的、
+
 
 
 
